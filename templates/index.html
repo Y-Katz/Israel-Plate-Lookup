@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>חיפוש לפי מספר רכב</title>
+    <style>
+		body {
+			font-family: Calibri, sans-serif;
+			padding: 20px;
+			background-color: #f6f6f6;
+		}
+
+		h1 {
+			text-align: center;
+			font-size: 26px;
+			color: #333;
+			font-family: Calibri;
+		}
+		
+		#form {
+			text-align: center;
+			margin-top: 20px;
+		}
+		
+
+		select {
+			font-family: Calibri, sans-serif;
+			font-size: 18px;
+			padding: 6px;
+		}		
+
+		input[type="text"] {
+			font-family: Calibri;
+			font-size: 40px;
+			font-weight: bold;
+			text-align: center;
+			background: #f0ac28;
+			color: #222222;
+			border: 3px solid #616161;
+			border-radius: 5px;
+			padding: 1px;
+			height: 43px;
+			width: 200px;
+		}
+		
+		textarea#tzamah {
+			font-family: Calibri, sans-serif;
+			font-size: 40px;
+			font-weight: bold;
+			background: #000000;
+			color: #ffffff;
+			border: 2px solid #ffffff;
+			border-radius: 5px;
+			padding: 1px;
+			width: 85px;
+			height: 100px;
+			text-align: center;
+			resize: none;
+		}
+		
+        #result {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+            direction: rtl;
+        }
+        #loading {
+            text-align: center;
+            font-size: 18px;
+            color: #555;
+            margin-bottom: 10px;
+        }
+		
+		button {
+			font-family: Calibri;
+			font-size: 22px;
+			background: #EDEDED;
+			border: 1px;
+			border-radius: 4px;
+			padding: 6px 14px;
+			margin-top: 5px;
+			cursor: pointer;
+		}
+
+		button:hover {
+			background: #e0e0e0;
+		}
+		
+		.history-header {
+			text-align: right;
+			color: #8b4513;  /* חום-כהה */
+			font-weight: bold;
+			font-size: 16px;
+			margin-top: 30px;
+		}
+
+
+		#loading {
+			font-family: Calibri, sans-serif;
+			font-size: 20px;
+			color: #007700;
+			text-align: center;
+			margin-top: 10px;
+			height: 28px;
+			transition: opacity 0.3s ease-in-out;
+		}
+
+		
+    </style>
+</head>
+
+
+
+
+
+
+<body>
+
+<h1>הכנס לוחית רישוי:</h1>
+
+<div id="form">
+    <select id="mode">
+        <option value="Regular">לוחית רגילה</option>
+        <option value='צמ"ה'>צמ"ה</option>
+    </select>
+    
+    <br><br>
+
+    <input type="text" id="plate" dir="ltr" placeholder="">
+    <textarea id="tzamah" placeholder="" style="display: none;"></textarea>
+
+    <br><br>
+
+    <button onclick="searchPlate()">חיפוש ⌕︎</button>
+</div>
+
+<div id="loading"></div>
+<div id="result"></div>
+
+
+
+
+
+<script>
+	let loadingTimer = null;
+	let startTime = null;
+
+	function searchPlate() {
+		const mode = document.getElementById("mode").value;
+		const plate = mode === 'צמ"ה'
+			? document.getElementById("tzamah").value.replace(/\D/g, "").slice(0, 6)
+			: document.getElementById("plate").value.replace(/\D/g, "").slice(0, 8);
+
+		const loading = document.getElementById("loading");
+		const result = document.getElementById("result");
+
+		if (!plate) {
+			alert("אנא הזן מספר לוחית רישוי.");
+			return;
+		}
+
+		result.innerHTML = "";
+		loading.innerText = "⏳ טוען... 0.0 שניות";
+		loading.style.opacity = 1;
+
+		startTime = Date.now();
+		clearInterval(loadingTimer);
+		loadingTimer = setInterval(() => {
+			const seconds = ((Date.now() - startTime) / 1000).toFixed(1);
+			loading.innerText = `⏳ טוען... ${seconds} שניות`;
+		}, 100);
+
+		fetch(`/api/search_plate?plate=${encodeURIComponent(plate)}&mode=${encodeURIComponent(mode)}`)
+			.then(r => r.json())
+			.then(data => {
+				clearInterval(loadingTimer);
+				const duration = data.time ? Number(data.time).toFixed(1) : ((Date.now() - startTime) / 1000).toFixed(1);
+				loading.innerText = `✅ הושלם תוך ${duration} שניות`;
+				result.innerHTML = data.html || "לא נמצאו תוצאות.";
+			})
+			.catch(err => {
+				clearInterval(loadingTimer);
+				loading.innerText = "❌ שגיאה";
+				result.innerHTML = "אירעה שגיאה.";
+				console.error(err);
+			});
+	}
+
+    function toggleInputMode() {
+        const mode = document.getElementById("mode").value;
+        const plateInput = document.getElementById("plate");
+        const tzamahInput = document.getElementById("tzamah");
+
+        if (mode === 'צמ"ה') {
+            plateInput.style.display = "none";
+            tzamahInput.style.display = "inline-block";
+        } else {
+            plateInput.style.display = "inline-block";
+            tzamahInput.style.display = "none";
+        }
+    }
+
+    document.getElementById("mode").addEventListener("change", toggleInputMode);
+    toggleInputMode(); 
+	
+	document.getElementById("plate").addEventListener("keydown", function (e) {
+		if (e.key === "Enter") {
+			searchPlate();
+		}
+	});
+
+	document.getElementById("tzamah").addEventListener("keydown", function (e) {
+		if (e.key === "Enter") {
+			e.preventDefault(); // שלא יתווסף שורה בטקסט
+			searchPlate();
+		}
+	});	
+	
+	// עבור לוחית רגילה – רק ספרות, עד 8
+	document.getElementById("plate").addEventListener("input", function () {
+		this.value = this.value.replace(/\D/g, "").slice(0, 8);
+	});
+
+	// עבור צמ"ה – רק ספרות, עד 6
+	document.getElementById("tzamah").addEventListener("input", function () {
+		this.value = this.value.replace(/\D/g, "").slice(0, 6);
+	});	
+
+	function formatRegularPlate(value) {
+		const digits = value.replace(/\D/g, "").slice(0, 8);
+		let formatted = digits;
+
+		if (digits.length === 8) {
+			formatted = `${digits.slice(0, 3)}‧${digits.slice(3, 5)}‧${digits.slice(5)}`;
+		} else if (digits.length === 7) {
+			formatted = `${digits.slice(0, 2)}‧${digits.slice(2, 5)}‧${digits.slice(5)}`;
+		} else if (digits.length === 6) {
+			formatted = `${digits.slice(0, 3)}‧${digits.slice(3)}`;
+		} else if (digits.length === 5) {
+			formatted = `${digits.slice(0, 2)}‧${digits.slice(2)}`;
+		}
+
+		return formatted;
+	}
+
+	function formatTzamah(value) {
+		const digits = value.replace(/\D/g, "").slice(0, 6);
+		if (digits.length === 6) {
+			return `${digits.slice(0, 3)}\n${digits.slice(3)}`;
+		} else if (digits.length === 4 || digits.length === 5) {
+			return `${digits.slice(0, 2)}\n${digits.slice(2)}`;
+		}
+		return digits;
+	}
+
+	const plateInput = document.getElementById("plate");
+	plateInput.addEventListener("input", function () {
+		const digits = this.value.replace(/\D/g, "").slice(0, 8);
+		this.value = formatRegularPlate(digits);
+	});
+
+	const tzamahInput = document.getElementById("tzamah");
+	tzamahInput.addEventListener("input", function () {
+		const formatted = formatTzamah(this.value);
+		this.value = formatted;
+	});
+
+
+		
+</script>
+
+</body>
+</html>
